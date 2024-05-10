@@ -116,23 +116,24 @@ class Api
 
     /**
      * @param \GuzzleHttp\Cookie\CookieJar $cookies
+     * @param \GuzzleHttp\Cookie\SetCookie $session
+     * @param string $username
+     * @param bool $saveCookies
      *
      * @throws Exception\InstagramAuthException
      */
-    public function loginWithCookies(CookieJar $cookies): void
+    public function loginWithCookies(CookieJar $cookies, SetCookie $session, string $username, bool $saveCookies = false): void
     {
         $login = new Login($this->client, '', '', null, $this->challengeDelay);
 
-        /** @var SetCookie */
-        $session = $cookies->getCookieByName('sessionId');
+        if ($saveCookies) {
+            // Get New Cookies
+            $cookies = $login->withCookies($session->toArray());
 
-        // Session expired (should never happened, Instagram TTL is ~ 1 year)
-        if ($session->getExpires() < time()) {
-            throw new InstagramAuthException('Session expired, Please login with instagram credentials.');
+            $sessionData = $this->cachePool->getItem(Session::SESSION_KEY . '.' . CacheHelper::sanitizeUsername($username));
+            $sessionData->set($cookies);
+            $this->cachePool->save($sessionData);
         }
-
-        // Get New Cookies
-        $cookies = $login->withCookies($session->toArray());
 
         $this->session = new Session($cookies);
     }
